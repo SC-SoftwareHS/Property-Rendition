@@ -1,0 +1,5 @@
+description,category,original_cost,acquisition_date,quantity,disposal_date,is_leased,lessor_name,lessor_address,notes
+"Dell OptiPlex Desktop",computer_equipment,1200.00,2023-01-15,5,,,,,Office computers
+"Herman Miller Desk",furniture_fixtures,850.00,2022-06-01,10,,,,,"Standing desks, adjustable"
+"Toyota Camry",vehicles,28500.00,2024-03-20,1,,,,,Company vehicle
+"Copier - Xerox VersaLink",leased_equipment,0.00,2023-09-01,1,,true,"Xerox Financial Services","123 Lease Blvd, Rochester NY 14604",36-month lease

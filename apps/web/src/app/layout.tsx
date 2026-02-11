@@ -1,21 +1,24 @@
 import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
+import { QueryProvider } from '@/providers/query-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'RenditionReady',
-  description: 'Property rendition management platform'
+  description: 'Property rendition management platform',
 };
 
 export default function RootLayout({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) {
   return (
     <ClerkProvider>
       <html lang="en">
-        <body>{children}</body>
+        <body>
+          <QueryProvider>{children}</QueryProvider>
+        </body>
       </html>
     </ClerkProvider>
   );
