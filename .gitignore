@@ -1,0 +1,16 @@
+node_modules
+.env
+.env.local
+.env.*.local
+.next
+.dist
+out
+coverage
+.DS_Store
+
+# Nest build
+apps/api/dist
+
+# Turborepo / misc
+.turbo
+
