@@ -1,23 +1,27 @@
-import { PDFDocument, PDFForm } from 'pdf-lib';
+import { PDFForm } from 'pdf-lib';
 import { CalculationResult, CategorySummary } from '../../depreciation/depreciation.service';
 
 /**
  * TX Form 50-144 field mapping strategy.
  *
- * The form is organized into sections:
- * - Page 1: Owner info, account info, leased property
- * - Schedule A (Section A): Furniture & Fixtures (15 year-rows)
- * - Schedule B (Section B): Machinery & Equipment (9 year-rows)
- * - Schedule C (Section C): Computer Equipment (6 year-rows)
- * - Schedule D (Section D): Vehicles / Boats / Aircraft (9 year-rows)
- * - Schedule E: Other categories broken into sub-schedules (EA-EJ)
+ * The form has 632 named interactive fields across 6 pages:
  *
- * Each schedule has:
- *   - HCost fields for historical cost by year (e.g. AHCost1 = current year)
- *   - DValue fields for depreciated value by year (e.g. ADValue1)
- *   - A total field (e.g. A2Value)
+ * Page 1: Owner info (Text1-Text6, Text9=account#), tax year, checkboxes
+ * Page 2: Schedules A-D side-by-side (same rows, different columns)
+ *   - Schedule A (Furniture & Fixtures): 15 rows — AHCost1-15, ADValue1-15
+ *   - Schedule B (Machinery & Equipment): 9 rows — BHCost1-9, BDValue1-9
+ *   - Schedule C (Computer Equipment): 6 rows — CHCost1-6, CDValue1-6
+ *   - Schedule D (Vehicles): 9 rows — DHCost1-9, DDValue1-9
+ *   - Year labels: DatePrinted(row1), DatePrinted1(row2)...DatePrinted13(row14)
+ *   - Section totals: A2/A2Value, B2/B2Value, C2/C2Value, D2/D2Value
+ *   - Row N = tax year - (N-1). Row 1 = current year, Row 2 = prior year, etc.
  *
- * Year rows count DOWN from current year (row 1 = current tax year, row 2 = prior year).
+ * Pages 3-4: Schedule E with 10 sub-sections (EA-EJ):
+ *   Upper half: EA(5), EB(6), EC(8), ED(9), EE(11)
+ *   Lower half: EF(12), EG(15), EH(18), EI(23), EJ(30)
+ *   Year labels: yy/yy2+ fields mapped per sub-section
+ *
+ * Page 2 bottom: Grand totals — G2Value (total depreciated), G2 (total cost)
  */
 
 /** Category → PDF schedule section mapping */
@@ -26,8 +30,6 @@ const CATEGORY_SECTION: Record<string, string> = {
   machinery_equipment: 'B',
   computer_equipment: 'C',
   vehicles: 'D',
-  // Remaining categories go into Schedule E sub-sections
-  // leasehold_improvements, inventory, supplies, leased_equipment, other
 };
 
 /** Max rows per section in the PDF form */
@@ -36,6 +38,25 @@ const SECTION_MAX_ROWS: Record<string, number> = {
   B: 9,
   C: 6,
   D: 9,
+};
+
+/**
+ * Schedule E category → sub-section mapping.
+ * We map our 5 asset categories across the 10 available sub-sections (EA-EJ).
+ * Currently using EA-EE; EF-EJ are available for future expansion.
+ */
+const SCHEDULE_E_CATEGORIES: Record<string, string> = {
+  leasehold_improvements: 'EA',
+  inventory: 'EB',
+  supplies: 'EC',
+  leased_equipment: 'ED',
+  other: 'EE',
+};
+
+/** Max rows per Schedule E sub-section */
+const SCHEDULE_E_MAX_ROWS: Record<string, number> = {
+  EA: 5, EB: 6, EC: 8, ED: 9, EE: 11,
+  EF: 12, EG: 15, EH: 18, EI: 23, EJ: 30,
 };
 
 export interface OwnerInfo {
@@ -73,13 +94,17 @@ export function fillTxForm(
   setFieldSafe(form, 'Text3', `${owner.city}, ${owner.state} ${owner.zip}`);
   if (owner.phone) setFieldSafe(form, 'Text4', owner.phone);
   if (owner.ein) setFieldSafe(form, 'Text6', owner.ein);
-  if (owner.accountNumber) setFieldSafe(form, 'G1', owner.accountNumber);
+  if (owner.accountNumber) setFieldSafe(form, 'Text9', owner.accountNumber);
 
   // Tax year
-  const taxYearStr = String(calculation.taxYear);
+  const taxYear = calculation.taxYear;
+  const taxYearStr = String(taxYear);
   setFieldSafe(form, 'CurrYear1', taxYearStr);
   setFieldSafe(form, 'CurrYear2', taxYearStr);
   setFieldSafe(form, 'CurrYear3', taxYearStr);
+
+  // Year labels for Schedules A-D and E are pre-filled in the template.
+  // No need to fill DatePrinted/yr/yy fields — they already have correct values.
 
   let grandTotalCost = 0;
   let grandTotalValue = 0;
@@ -90,51 +115,49 @@ export function fillTxForm(
     if (!catData) continue;
 
     const maxRows = SECTION_MAX_ROWS[section] ?? 10;
-    const result = fillScheduleSection(form, section, catData, calculation.taxYear, maxRows);
+    const result = fillScheduleSection(form, section, catData, taxYear, maxRows);
     grandTotalCost += result.totalCost;
     grandTotalValue += result.totalValue;
   }
 
   // --- Fill Schedule E sub-sections for remaining categories ---
-  // Map remaining categories to Schedule E sub-sections
-  const scheduleECategories: Record<string, string> = {
-    leasehold_improvements: 'EA',
-    inventory: 'EB',
-    supplies: 'EC',
-    leased_equipment: 'ED',
-    other: 'EE',
-  };
+  let eTotalCost = 0;
+  let eTotalValue = 0;
 
-  // Schedule E sub-sections have different max rows
-  const scheduleEMaxRows: Record<string, number> = {
-    EA: 5, EB: 6, EC: 8, ED: 9, EE: 11,
-  };
-
-  for (const [category, subSection] of Object.entries(scheduleECategories)) {
+  for (const [category, subSection] of Object.entries(SCHEDULE_E_CATEGORIES)) {
     const catData = calculation.byCategory[category];
     if (!catData) continue;
 
-    const maxRows = scheduleEMaxRows[subSection] ?? 10;
-    const result = fillScheduleESection(form, subSection, catData, calculation.taxYear, maxRows);
+    const maxRows = SCHEDULE_E_MAX_ROWS[subSection] ?? 10;
+    const result = fillScheduleESection(form, subSection, catData, taxYear, maxRows);
     grandTotalCost += result.totalCost;
     grandTotalValue += result.totalValue;
+    eTotalCost += result.totalCost;
+    eTotalValue += result.totalValue;
 
     // Set sub-section total
     setFieldSafe(form, subSection, formatCurrency(result.totalValue));
   }
 
   // Schedule E total
-  const eTotal = Object.keys(scheduleECategories).reduce((sum, cat) => {
-    return sum + (calculation.byCategory[cat]?.totalDepreciatedValue ?? 0);
-  }, 0);
-  if (eTotal > 0) {
-    setFieldSafe(form, 'E2Value', formatCurrency(eTotal));
+  if (eTotalValue > 0) {
+    setFieldSafe(form, 'E2Value', formatCurrency(eTotalValue));
+    setFieldSafe(form, 'E2', formatCurrency(eTotalCost));
   }
 
-  // Grand totals (F2 is supplies/other total, G2Value is total of everything)
+  // --- Grand totals ---
   setFieldSafe(form, 'G2Value', formatCurrency(calculation.grandTotalDepreciatedValue));
+  setFieldSafe(form, 'G2', formatCurrency(calculation.grandTotalOriginalCost));
 }
 
+/**
+ * Fill a Schedule A-D section with year-grouped asset data.
+ *
+ * Assets are placed in the row matching their acquisition year:
+ *   Row N = taxYear - acquisitionYear
+ * Row 1 = prior year (e.g. 2025 for tax year 2026).
+ * Current-year acquisitions (row 0) are placed in row 1.
+ */
 function fillScheduleSection(
   form: PDFForm,
   section: string,
@@ -142,31 +165,37 @@ function fillScheduleSection(
   taxYear: number,
   maxRows: number,
 ): { totalCost: number; totalValue: number } {
-  // Sort year groups by acquisition year descending (most recent first)
-  const yearEntries = Object.entries(catData.byYear)
-    .map(([year, data]) => ({ year: parseInt(year, 10), data }))
-    .sort((a, b) => b.year - a.year);
-
   let totalCost = 0;
   let totalValue = 0;
 
-  for (let i = 0; i < Math.min(yearEntries.length, maxRows); i++) {
-    const rowNum = i + 1;
-    const entry = yearEntries[i];
+  for (const [yearStr, data] of Object.entries(catData.byYear)) {
+    const acquisitionYear = parseInt(yearStr, 10);
+    let rowNum = taxYear - acquisitionYear;
 
-    setFieldSafe(form, `${section}HCost${rowNum}`, formatCurrency(entry.data.originalCost));
-    setFieldSafe(form, `${section}DValue${rowNum}`, formatCurrency(entry.data.depreciatedValue));
+    // Current-year acquisitions go in row 1
+    if (rowNum <= 0) rowNum = 1;
+    // Skip if row is out of range (too old)
+    if (rowNum > maxRows) continue;
 
-    totalCost += entry.data.originalCost;
-    totalValue += entry.data.depreciatedValue;
+    setFieldSafe(form, `${section}HCost${rowNum}`, formatCurrency(data.originalCost));
+    setFieldSafe(form, `${section}DValue${rowNum}`, formatCurrency(data.depreciatedValue));
+
+    totalCost += data.originalCost;
+    totalValue += data.depreciatedValue;
   }
 
-  // Section total
+  // Section totals (both cost and depreciated value)
   setFieldSafe(form, `${section}2Value`, formatCurrency(totalValue));
+  setFieldSafe(form, `${section}2`, formatCurrency(totalCost));
 
   return { totalCost, totalValue };
 }
 
+/**
+ * Fill a Schedule E sub-section with year-grouped asset data.
+ * Same year-to-row mapping as Schedules A-D.
+ * Year labels are pre-filled in the template.
+ */
 function fillScheduleESection(
   form: PDFForm,
   subSection: string,
@@ -174,22 +203,22 @@ function fillScheduleESection(
   taxYear: number,
   maxRows: number,
 ): { totalCost: number; totalValue: number } {
-  const yearEntries = Object.entries(catData.byYear)
-    .map(([year, data]) => ({ year: parseInt(year, 10), data }))
-    .sort((a, b) => b.year - a.year);
-
   let totalCost = 0;
   let totalValue = 0;
 
-  for (let i = 0; i < Math.min(yearEntries.length, maxRows); i++) {
-    const rowNum = i + 1;
-    const entry = yearEntries[i];
+  for (const [yearStr, data] of Object.entries(catData.byYear)) {
+    const acquisitionYear = parseInt(yearStr, 10);
+    let rowNum = taxYear - acquisitionYear;
 
-    setFieldSafe(form, `${subSection}HCost${rowNum}`, formatCurrency(entry.data.originalCost));
-    setFieldSafe(form, `${subSection}DValue${rowNum}`, formatCurrency(entry.data.depreciatedValue));
+    // Current-year acquisitions go in row 1
+    if (rowNum <= 0) rowNum = 1;
+    if (rowNum > maxRows) continue;
 
-    totalCost += entry.data.originalCost;
-    totalValue += entry.data.depreciatedValue;
+    setFieldSafe(form, `${subSection}HCost${rowNum}`, formatCurrency(data.originalCost));
+    setFieldSafe(form, `${subSection}DValue${rowNum}`, formatCurrency(data.depreciatedValue));
+
+    totalCost += data.originalCost;
+    totalValue += data.depreciatedValue;
   }
 
   return { totalCost, totalValue };

@@ -37,9 +37,9 @@ export class PdfService {
       throw new NotFoundException('Rendition not found');
     }
 
-    if (rendition.status !== 'approved') {
+    if (rendition.status !== 'approved' && rendition.status !== 'filed') {
       throw new BadRequestException(
-        `Rendition must be in "approved" status to generate PDF. Current: "${rendition.status}"`,
+        `Rendition must be in "approved" or "filed" status to generate PDF. Current: "${rendition.status}"`,
       );
     }
 
@@ -53,7 +53,7 @@ export class PdfService {
     const clientData = await this.loadClientAndLocation(firmId, clientId, locationId);
 
     // Load the blank TX Form 50-144 template
-    const templatePath = path.join(__dirname, 'templates', 'tx-50-144.pdf');
+    const templatePath = path.join(process.cwd(), 'src', 'pdf', 'templates', 'tx-50-144.pdf');
     let templateBytes: Uint8Array;
 
     try {
@@ -83,8 +83,12 @@ export class PdfService {
 
     fillTxForm(form, ownerInfo, calculation);
 
-    // Flatten the form (make fields read-only)
-    form.flatten();
+    // Mark filled fields as read-only (flatten can crash on large government PDFs)
+    try {
+      form.flatten();
+    } catch (err) {
+      this.logger.warn(`form.flatten() failed, saving with editable fields: ${err}`);
+    }
 
     const pdfBytes = await pdfDoc.save();
     const filename = `rendition-${clientData.companyName.replace(/[^a-zA-Z0-9]/g, '-')}-${rendition.taxYear}.pdf`;

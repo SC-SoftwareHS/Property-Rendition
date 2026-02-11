@@ -44,3 +44,13 @@ yarn-error.log*
 
 # Claude
 .claude/
+
+# Reports & generated docs
+.reports/
+codemaps/
+
+# Screenshots & test artifacts
+screenshots/
+
+# Test credentials
+TEST_CREDENTIALS.md

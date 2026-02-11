@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Table,
@@ -24,6 +25,7 @@ function formatCurrency(amount: number) {
 }
 
 export function RenditionsTable({ data, clientId, locationId, showLocation = false }: Props) {
+  const router = useRouter();
   if (data.length === 0) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -53,7 +55,11 @@ export function RenditionsTable({ data, clientId, locationId, showLocation = fal
             const lId = locationId ?? r.locationId;
 
             return (
-              <TableRow key={r.id}>
+              <TableRow
+                key={r.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/clients/${cId}/locations/${lId}/renditions/${r.id}`)}
+              >
                 <TableCell>
                   <Link
                     href={`/clients/${cId}/locations/${lId}/renditions/${r.id}`}

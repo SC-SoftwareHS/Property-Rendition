@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   useReactTable,
   getCoreRowModel,
@@ -34,6 +35,7 @@ interface ClientsTableProps {
 }
 
 export function ClientsTable({ data, onEdit }: ClientsTableProps) {
+  const router = useRouter();
   const deleteClient = useDeleteClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -83,9 +85,14 @@ export function ClientsTable({ data, onEdit }: ClientsTableProps) {
       cell: ({ row }) => {
         const client = row.original;
         return (
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -134,7 +141,11 @@ export function ClientsTable({ data, onEdit }: ClientsTableProps) {
         <TableBody>
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/clients/${row.original.id}`)}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

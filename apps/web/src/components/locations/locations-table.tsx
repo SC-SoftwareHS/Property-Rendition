@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-table';
 import { MoreHorizontal, Pencil, Trash2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Table,
@@ -36,6 +37,7 @@ interface LocationsTableProps {
 }
 
 export function LocationsTable({ data, clientId, onEdit }: LocationsTableProps) {
+  const router = useRouter();
   const deleteLocation = useDeleteLocation(clientId);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -97,9 +99,14 @@ export function LocationsTable({ data, clientId, onEdit }: LocationsTableProps) 
       cell: ({ row }) => {
         const loc = row.original;
         return (
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -148,7 +155,11 @@ export function LocationsTable({ data, clientId, onEdit }: LocationsTableProps) 
         <TableBody>
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow
+                key={row.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/clients/${clientId}/locations/${row.original.location.id}`)}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
