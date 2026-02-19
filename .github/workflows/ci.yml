@@ -35,7 +35,7 @@ jobs:
         working-directory: apps/web
 
     env:
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXF1aXBwZWQtZ3JvdXNlLTM3LmNsZXJrLmFjY291bnRzLmRldiQ
       NEXT_PUBLIC_API_URL: http://localhost:3002
 
     steps:
