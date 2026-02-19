@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useFirm } from '@/hooks/use-firm';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -14,6 +15,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: firm } = useFirm();
 
   return (
     <aside className="flex h-full w-60 flex-col border-r bg-muted/40">
@@ -22,6 +24,13 @@ export function Sidebar() {
           RenditionReady
         </Link>
       </div>
+
+      {firm && (
+        <div className="flex items-center gap-2 border-b px-4 py-3">
+          <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium truncate">{firm.name}</span>
+        </div>
+      )}
 
       <nav className="flex-1 space-y-1 px-2 py-4">
         {navItems.map((item) => {

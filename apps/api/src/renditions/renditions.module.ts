@@ -3,9 +3,10 @@ import { RenditionsService } from './renditions.service';
 import { RenditionsController } from './renditions.controller';
 import { DepreciationModule } from '../depreciation/depreciation.module';
 import { PdfModule } from '../pdf/pdf.module';
+import { RelatedEntitiesModule } from '../related-entities/related-entities.module';
 
 @Module({
-  imports: [DepreciationModule, PdfModule],
+  imports: [DepreciationModule, PdfModule, RelatedEntitiesModule],
   providers: [RenditionsService],
   controllers: [RenditionsController],
   exports: [RenditionsService],

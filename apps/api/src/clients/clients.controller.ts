@@ -14,6 +14,7 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { QueryClientsDto } from './dto/query-clients.dto';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('clients')
 export class ClientsController {
@@ -46,6 +47,7 @@ export class ClientsController {
     return this.clientsService.update(user.firmId, id, dto);
   }
 
+  @Roles('admin')
   @Delete(':id')
   remove(
     @CurrentUser() user: AuthUser,

@@ -17,14 +17,15 @@ export interface DashboardStats {
   }[];
 }
 
-export function useDashboardStats() {
+export function useDashboardStats(taxYear?: number) {
   const { getToken } = useAuth();
 
   return useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: ['dashboard-stats', taxYear],
     queryFn: async () => {
       const token = await getToken();
-      return apiClient<DashboardStats>('/dashboard/stats', { token });
+      const qs = taxYear ? `?taxYear=${taxYear}` : '';
+      return apiClient<DashboardStats>(`/dashboard/stats${qs}`, { token });
     },
   });
 }

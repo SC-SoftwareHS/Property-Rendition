@@ -100,6 +100,13 @@ const CATEGORY_TO_PTAD_LIFE: Record<string, string> = {
   vehicles: '6yr',
   leased_equipment: '10yr',
   other: '10yr',
+  office_equipment: '10yr',
+  medical_equipment: '8yr',
+  restaurant_equipment: '8yr',
+  telecommunications: '5yr',
+  software: '3yr',
+  tools_dies: '7yr',
+  signs_displays: '7yr',
 };
 
 function buildEntries(): DepreciationEntry[] {

@@ -1,3 +1,10 @@
+export interface FmvOverrideEntry {
+  overrideValue: number;
+  reason: string;
+  appliedBy: string;
+  appliedAt: string;
+}
+
 export interface Rendition {
   id: string;
   locationId: string;
@@ -8,6 +15,13 @@ export interface Rendition {
   filedBy: string | null;
   filedAt: string | null;
   pdfUrl: string | null;
+  fmvOverrides: Record<string, FmvOverrideEntry> | null;
+  // HB 9 ($125K BPP exemption) fields
+  hb9Exempt: boolean;
+  hb9HasRelatedEntities: boolean;
+  hb9ElectNotToRender: boolean;
+  hb9ExemptionAmount: string;
+  hb9NetTaxableValue: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +68,17 @@ export interface AssetCalculation {
   depreciatedValue: number;
   quantity: number;
   isLeased: boolean;
+  isOverridden?: boolean;
+  overrideValue?: number;
+  originalDepreciatedValue?: number;
+}
+
+export interface Hb9Exemption {
+  exemptionAmount: number;
+  isExempt: boolean;
+  hasRelatedEntities: boolean;
+  electNotToRender: boolean;
+  netTaxableValue: number;
 }
 
 export interface CalculationResult {
@@ -65,6 +90,7 @@ export interface CalculationResult {
   grandTotalDepreciatedValue: number;
   totalAssetCount: number;
   assets: AssetCalculation[];
+  hb9?: Hb9Exemption;
 }
 
 export const STATUS_LABELS: Record<RenditionStatus, string> = {
@@ -83,12 +109,32 @@ export const STATUS_COLORS: Record<RenditionStatus, string> = {
   filed: 'bg-purple-100 text-purple-800',
 };
 
+export interface BatchGenerateResult {
+  total: number;
+  success: number;
+  failed: number;
+  results: {
+    renditionId: string;
+    companyName: string;
+    locationName: string;
+    filename?: string;
+    error?: string;
+  }[];
+}
+
 export const CATEGORY_LABELS: Record<string, string> = {
   furniture_fixtures: 'Furniture & Fixtures',
+  office_equipment: 'Office Equipment',
   machinery_equipment: 'Machinery & Equipment',
+  medical_equipment: 'Medical / Professional Equipment',
+  restaurant_equipment: 'Restaurant / Store Equipment',
   computer_equipment: 'Computer Equipment',
+  telecommunications: 'Telecommunications',
+  software: 'Software',
   leasehold_improvements: 'Leasehold Improvements',
   vehicles: 'Vehicles',
+  tools_dies: 'Tools, Dies & Molds',
+  signs_displays: 'Signs & Displays',
   inventory: 'Inventory',
   supplies: 'Supplies',
   leased_equipment: 'Leased Equipment',

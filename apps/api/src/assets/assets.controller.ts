@@ -13,6 +13,7 @@ import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { BulkCreateAssetsDto } from './dto/bulk-create-assets.dto';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('clients/:clientId/locations/:locationId/assets')
 export class AssetsController {
@@ -77,6 +78,7 @@ export class AssetsController {
     return this.assetsService.update(user.firmId, clientId, locationId, id, dto);
   }
 
+  @Roles('admin')
   @Delete(':id')
   remove(
     @CurrentUser() user: AuthUser,

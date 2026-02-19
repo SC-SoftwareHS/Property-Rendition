@@ -9,11 +9,11 @@ import {
 import { Request, Response } from 'express';
 import { Webhook } from 'svix';
 import { ConfigService } from '@nestjs/config';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull, gt } from 'drizzle-orm';
 import { Public } from '../auth/decorators/public.decorator';
 import { InjectDrizzle } from '../database/drizzle.decorator';
 import { DrizzleDB } from '../database/database.module';
-import { firms, users } from '../database/schema';
+import { firms, users, firmInvites } from '../database/schema';
 
 interface ClerkUserCreatedEvent {
   data: {
@@ -110,7 +110,44 @@ export class WebhooksController {
       return;
     }
 
-    // Create firm + admin user in a single transaction
+    // Check for a pending invite matching this email
+    const [invite] = await this.db
+      .select()
+      .from(firmInvites)
+      .where(
+        and(
+          eq(firmInvites.email, email.toLowerCase()),
+          isNull(firmInvites.acceptedAt),
+          gt(firmInvites.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+
+    if (invite) {
+      // Join existing firm via invite
+      await this.db.transaction(async (tx) => {
+        await tx.insert(users).values({
+          firmId: invite.firmId,
+          clerkUserId,
+          email,
+          firstName: first_name,
+          lastName: last_name,
+          role: invite.role,
+        });
+
+        await tx
+          .update(firmInvites)
+          .set({ acceptedAt: new Date() })
+          .where(eq(firmInvites.id, invite.id));
+
+        this.logger.log(
+          `User ${clerkUserId} joined firm ${invite.firmId} via invite (role: ${invite.role})`,
+        );
+      });
+      return;
+    }
+
+    // No invite found — create new firm + admin user
     await this.db.transaction(async (tx) => {
       const [firm] = await tx
         .insert(firms)

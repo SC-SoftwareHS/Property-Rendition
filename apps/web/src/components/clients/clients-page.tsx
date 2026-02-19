@@ -2,11 +2,14 @@
 
 import { useState, useCallback } from 'react';
 import { Plus, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClients } from '@/hooks/use-clients';
+import { useExportClients } from '@/hooks/use-export';
 import { ClientsTable } from './clients-table';
 import { ClientFormDialog } from './client-form-dialog';
+import { ExportDropdown } from '@/components/export-dropdown';
 import type { Client } from '@/lib/validations/client';
 
 export function ClientsPage() {
@@ -15,6 +18,8 @@ export function ClientsPage() {
   const [page, setPage] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+
+  const { exportClients, isPending: isExporting } = useExportClients();
 
   const limit = 25;
   const { data, isLoading } = useClients({
@@ -52,10 +57,19 @@ export function ClientsPage() {
             Manage your client companies and contacts.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Client
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportDropdown
+            onExport={(fmt) => {
+              exportClients(fmt);
+              toast.info('Exporting clients...');
+            }}
+            isPending={isExporting}
+          />
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Client
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

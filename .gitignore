@@ -52,5 +52,10 @@ codemaps/
 # Screenshots & test artifacts
 screenshots/
 
+# Playwright
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/blob-report/
+
 # Test credentials
 TEST_CREDENTIALS.md

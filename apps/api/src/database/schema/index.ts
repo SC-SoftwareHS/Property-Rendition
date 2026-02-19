@@ -10,4 +10,6 @@ export * from './renditions';
 export * from './depreciation-schedules';
 export * from './form-templates';
 export * from './audit-logs';
+export * from './firm-invites';
+export * from './related-entity-groups';
 export * from './relations';

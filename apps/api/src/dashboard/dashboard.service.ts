@@ -14,8 +14,8 @@ import {
 export class DashboardService {
   constructor(@InjectDrizzle() private db: DrizzleDB) {}
 
-  async getStats(firmId: string) {
-    const currentTaxYear = new Date().getFullYear();
+  async getStats(firmId: string, taxYear?: number) {
+    const currentTaxYear = taxYear ?? new Date().getFullYear();
 
     // Run counts and rendition breakdown in parallel
     const [

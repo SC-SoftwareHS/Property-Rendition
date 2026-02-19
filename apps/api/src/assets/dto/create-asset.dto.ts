@@ -20,6 +20,13 @@ const ASSET_CATEGORIES = [
   'supplies',
   'leased_equipment',
   'other',
+  'office_equipment',
+  'medical_equipment',
+  'restaurant_equipment',
+  'telecommunications',
+  'software',
+  'tools_dies',
+  'signs_displays',
 ] as const;
 
 export class CreateAssetDto {

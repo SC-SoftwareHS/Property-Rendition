@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SupabaseModule } from './supabase/supabase.module';
@@ -16,12 +17,20 @@ import { ImportModule } from './import/import.module';
 import { DepreciationModule } from './depreciation/depreciation.module';
 import { RenditionsModule } from './renditions/renditions.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { RolloverModule } from './rollover/rollover.module';
+import { ExportModule } from './export/export.module';
+import { FirmsModule } from './firms/firms.module';
+import { UsersModule } from './users/users.module';
+import { BillingModule } from './billing/billing.module';
+import { RelatedEntitiesModule } from './related-entities/related-entities.module';
 import { ClerkAuthGuard } from './auth/auth.guard';
+import { RolesGuard } from './auth/roles.guard';
 import { AuditInterceptor } from './audit/audit.interceptor';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     DatabaseModule,
     SupabaseModule,
     AuthModule,
@@ -35,6 +44,12 @@ import { AuditInterceptor } from './audit/audit.interceptor';
     DepreciationModule,
     RenditionsModule,
     DashboardModule,
+    RolloverModule,
+    ExportModule,
+    FirmsModule,
+    UsersModule,
+    BillingModule,
+    RelatedEntitiesModule,
   ],
   controllers: [AppController],
   providers: [
@@ -42,6 +57,14 @@ import { AuditInterceptor } from './audit/audit.interceptor';
     {
       provide: APP_GUARD,
       useClass: ClerkAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
     {
       provide: APP_INTERCEPTOR,

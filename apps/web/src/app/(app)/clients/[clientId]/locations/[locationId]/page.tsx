@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Package, DollarSign, Upload, FileText } from 'lucide-react';
+import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,9 +12,11 @@ import { Separator } from '@/components/ui/separator';
 import { useLocation } from '@/hooks/use-locations';
 import { useAssets, useAssetSummary } from '@/hooks/use-assets';
 import { useRenditions } from '@/hooks/use-renditions';
+import { useExportAssets } from '@/hooks/use-export';
 import { AssetsTable } from '@/components/assets/assets-table';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import { ImportWizard } from '@/components/import/import-wizard';
+import { ExportDropdown } from '@/components/export-dropdown';
 import { RenditionsTable } from '@/components/renditions/renditions-table';
 import { CreateRenditionDialog } from '@/components/renditions/create-rendition-dialog';
 import type { Asset } from '@/lib/validations/asset';
@@ -29,6 +32,7 @@ export default function LocationDetailPage() {
   const { data: renditionsData, isLoading: renditionsLoading } = useRenditions(clientId, locationId);
 
   const queryClient = useQueryClient();
+  const { exportAssets, isPending: isExporting } = useExportAssets();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -142,6 +146,13 @@ export default function LocationDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ExportDropdown
+            onExport={(fmt) => {
+              exportAssets(fmt, { clientId, locationId });
+              toast.info('Exporting assets...');
+            }}
+            isPending={isExporting}
+          />
           <Button variant="outline" onClick={() => setShowImport(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import CSV

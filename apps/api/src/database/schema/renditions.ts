@@ -5,13 +5,21 @@ import {
   jsonb,
   varchar,
   timestamp,
+  boolean,
+  numeric,
   index,
 } from 'drizzle-orm/pg-core';
 import { renditionStatusEnum } from './enums';
 import { locations } from './locations';
 import { jurisdictions } from './jurisdictions';
 
-// Created in schema for Phase 2 rendition generation — not used in Phase 1
+export interface FmvOverrideEntry {
+  overrideValue: number;
+  reason: string;
+  appliedBy: string;
+  appliedAt: string;
+}
+
 export const renditions = pgTable(
   'renditions',
   {
@@ -28,6 +36,14 @@ export const renditions = pgTable(
     filedBy: uuid('filed_by'),
     filedAt: timestamp('filed_at'),
     pdfUrl: varchar('pdf_url', { length: 1000 }),
+    // HB 9 ($125K BPP exemption) — effective Jan 1, 2026
+    hb9Exempt: boolean('hb9_exempt').notNull().default(false),
+    hb9HasRelatedEntities: boolean('hb9_has_related_entities').notNull().default(false),
+    hb9ElectNotToRender: boolean('hb9_elect_not_to_render').notNull().default(false),
+    hb9ExemptionAmount: numeric('hb9_exemption_amount', { precision: 14, scale: 2 }).notNull().default('0'),
+    hb9NetTaxableValue: numeric('hb9_net_taxable_value', { precision: 14, scale: 2 }),
+    // Per-asset FMV overrides — JSON map of assetId → override entry
+    fmvOverrides: jsonb('fmv_overrides').$type<Record<string, FmvOverrideEntry>>().default({}),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at')
       .notNull()

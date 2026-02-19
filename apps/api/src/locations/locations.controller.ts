@@ -12,6 +12,7 @@ import { LocationsService } from './locations.service';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('clients/:clientId/locations')
 export class LocationsController {
@@ -53,6 +54,7 @@ export class LocationsController {
     return this.locationsService.update(user.firmId, clientId, id, dto);
   }
 
+  @Roles('admin')
   @Delete(':id')
   remove(
     @CurrentUser() user: AuthUser,

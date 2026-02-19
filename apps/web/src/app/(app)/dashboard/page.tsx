@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Users, MapPin, Package, FileText, Clock, ArrowRight } from 'lucide-react';
+import { Users, MapPin, Package, FileText, Clock, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,9 @@ import { cn } from '@/lib/utils';
 const STATUS_ORDER = ['not_started', 'in_progress', 'review', 'approved', 'filed'] as const;
 
 export default function Dashboard() {
-  const { data: stats, isLoading } = useDashboardStats();
+  const currentYear = new Date().getFullYear();
+  const [taxYear, setTaxYear] = useState(currentYear);
+  const { data: stats, isLoading } = useDashboardStats(taxYear);
 
   const totalRenditions = stats
     ? Object.values(stats.renditionsByStatus).reduce((a, b) => a + b, 0)
@@ -20,7 +23,28 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTaxYear((y) => y - 1)}
+            disabled={taxYear <= 2000}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium w-12 text-center">{taxYear}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTaxYear((y) => y + 1)}
+            disabled={taxYear >= 2100}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -75,7 +99,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Renditions ({stats?.currentTaxYear ?? new Date().getFullYear()})
+              Renditions ({taxYear})
             </CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>

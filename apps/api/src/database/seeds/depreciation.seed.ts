@@ -5,6 +5,8 @@ import { sql } from 'drizzle-orm';
 import * as schema from '../schema';
 import { depreciationSchedules } from '../schema';
 import { txDepreciation } from './data/tx-depreciation';
+import { okDepreciation } from './data/ok-depreciation';
+import { flDepreciation } from './data/fl-depreciation';
 
 async function seed() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -19,7 +21,7 @@ async function seed() {
 
   const db = drizzle(pool, { schema });
 
-  const allEntries = [...txDepreciation];
+  const allEntries = [...txDepreciation, ...okDepreciation, ...flDepreciation];
 
   console.log(`Seeding ${allEntries.length} depreciation schedule entries...`);
 

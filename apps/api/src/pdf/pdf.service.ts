@@ -4,21 +4,25 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { PDFDocument } from 'pdf-lib';
-import * as fs from 'fs';
-import * as path from 'path';
 import { and, eq, isNull } from 'drizzle-orm';
 import { InjectDrizzle } from '../database/drizzle.decorator';
 import { DrizzleDB } from '../database/database.module';
 import { renditions, locations, clients, jurisdictions } from '../database/schema';
-import { CalculationResult } from '../depreciation/depreciation.service';
-import { fillTxForm, OwnerInfo } from './strategies/tx-form.strategy';
+import { CalculationResult, DepreciationService } from '../depreciation/depreciation.service';
+import { FormStrategyFactory } from './strategies/form-strategy.factory';
+import { OwnerInfo } from './strategies/form-strategy.interface';
+import { TxHb9CertificationStrategy } from './strategies/tx-hb9-certification.strategy';
+import { DepreciationScheduleStrategy } from './strategies/depreciation-schedule.strategy';
+import type { FmvOverrideEntry } from '../database/schema/renditions';
 
 @Injectable()
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
 
-  constructor(@InjectDrizzle() private db: DrizzleDB) {}
+  constructor(
+    @InjectDrizzle() private db: DrizzleDB,
+    private readonly strategyFactory: FormStrategyFactory,
+  ) {}
 
   async generatePdf(
     firmId: string,
@@ -49,56 +53,121 @@ export class PdfService {
       );
     }
 
-    // Load client info for owner section
+    // Load client + location info for owner section
     const clientData = await this.loadClientAndLocation(firmId, clientId, locationId);
 
-    // Load the blank TX Form 50-144 template
-    const templatePath = path.join(process.cwd(), 'src', 'pdf', 'templates', 'tx-50-144.pdf');
-    let templateBytes: Uint8Array;
+    // Load jurisdiction for state + county routing
+    const jurisdiction = await this.loadJurisdiction(rendition.jurisdictionId);
 
-    try {
-      templateBytes = fs.readFileSync(templatePath);
-    } catch {
+    let calculation = rendition.calculatedTotals as unknown as CalculationResult;
+
+    // Apply FMV overrides if any exist
+    const overrides = rendition.fmvOverrides as Record<string, FmvOverrideEntry> | null;
+    if (overrides && Object.keys(overrides).length > 0) {
+      calculation = DepreciationService.applyOverrides(calculation, overrides);
+    }
+
+    // If TX elect-not-to-render, generate certification instead of full form
+    const isElectNotToRender = rendition.hb9ElectNotToRender &&
+      jurisdiction.state === 'TX' &&
+      calculation.hb9?.isExempt;
+
+    const strategy = isElectNotToRender
+      ? new TxHb9CertificationStrategy()
+      : this.strategyFactory.getStrategy(
+          jurisdiction.state,
+          jurisdiction.county,
+          calculation.grandTotalDepreciatedValue,
+        );
+
+    const ownerInfo: OwnerInfo = {
+      name: clientData.companyName,
+      address: clientData.address ?? '',
+      city: clientData.city ?? '',
+      state: clientData.state ?? jurisdiction.state,
+      zip: clientData.zip ?? '',
+      phone: clientData.contactPhone ?? undefined,
+      ein: clientData.ein ?? undefined,
+      accountNumber: clientData.accountNumber ?? undefined,
+      contactName: clientData.contactName ?? undefined,
+      contactEmail: clientData.contactEmail ?? undefined,
+      county: jurisdiction.county,
+    };
+
+    // Delegate to strategy
+    const { pdfBytes, formName } = await strategy.fillForm(ownerInfo, calculation);
+
+    const filename = `${formName.replace(/[^a-zA-Z0-9]/g, '-')}-${clientData.companyName.replace(/[^a-zA-Z0-9]/g, '-')}-${rendition.taxYear}.pdf`;
+
+    this.logger.log(
+      `Generated PDF (${strategy.strategyId}) for rendition ${renditionId}: ${filename}`,
+    );
+
+    return {
+      pdfBytes: Buffer.from(pdfBytes),
+      filename,
+    };
+  }
+
+  /**
+   * Generate a depreciation schedule attachment for a rendition.
+   * This is a separate PDF listing every asset with depreciation detail.
+   */
+  async generateDepreciationSchedule(
+    firmId: string,
+    clientId: string,
+    locationId: string,
+    renditionId: string,
+  ): Promise<{ pdfBytes: Buffer; filename: string }> {
+    const [rendition] = await this.db
+      .select()
+      .from(renditions)
+      .where(eq(renditions.id, renditionId))
+      .limit(1);
+
+    if (!rendition || !rendition.calculatedTotals) {
       throw new BadRequestException(
-        'TX Form 50-144 template not found. Ensure the template PDF is in the templates directory.',
+        'Rendition not found or has no calculated totals.',
       );
     }
 
-    // Load and fill the PDF
-    const pdfDoc = await PDFDocument.load(templateBytes);
-    const form = pdfDoc.getForm();
-
+    const clientData = await this.loadClientAndLocation(firmId, clientId, locationId);
+    const jurisdiction = await this.loadJurisdiction(rendition.jurisdictionId);
     const calculation = rendition.calculatedTotals as unknown as CalculationResult;
 
     const ownerInfo: OwnerInfo = {
       name: clientData.companyName,
       address: clientData.address ?? '',
       city: clientData.city ?? '',
-      state: clientData.state ?? 'TX',
+      state: clientData.state ?? jurisdiction.state,
       zip: clientData.zip ?? '',
-      phone: clientData.contactPhone ?? undefined,
-      ein: clientData.ein ?? undefined,
       accountNumber: clientData.accountNumber ?? undefined,
+      county: jurisdiction.county,
     };
 
-    fillTxForm(form, ownerInfo, calculation);
+    const strategy = new DepreciationScheduleStrategy();
+    const { pdfBytes } = await strategy.fillForm(ownerInfo, calculation);
 
-    // Mark filled fields as read-only (flatten can crash on large government PDFs)
-    try {
-      form.flatten();
-    } catch (err) {
-      this.logger.warn(`form.flatten() failed, saving with editable fields: ${err}`);
+    const filename = `Depreciation-Schedule-${clientData.companyName.replace(/[^a-zA-Z0-9]/g, '-')}-${rendition.taxYear}.pdf`;
+
+    return { pdfBytes: Buffer.from(pdfBytes), filename };
+  }
+
+  private async loadJurisdiction(jurisdictionId: string) {
+    const [j] = await this.db
+      .select({
+        state: jurisdictions.state,
+        county: jurisdictions.county,
+      })
+      .from(jurisdictions)
+      .where(eq(jurisdictions.id, jurisdictionId))
+      .limit(1);
+
+    if (!j) {
+      throw new NotFoundException('Jurisdiction not found for this rendition');
     }
 
-    const pdfBytes = await pdfDoc.save();
-    const filename = `rendition-${clientData.companyName.replace(/[^a-zA-Z0-9]/g, '-')}-${rendition.taxYear}.pdf`;
-
-    this.logger.log(`Generated PDF for rendition ${renditionId}: ${filename}`);
-
-    return {
-      pdfBytes: Buffer.from(pdfBytes),
-      filename,
-    };
+    return j;
   }
 
   private async loadClientAndLocation(
@@ -111,6 +180,8 @@ export class PdfService {
         companyName: clients.companyName,
         ein: clients.ein,
         contactPhone: clients.contactPhone,
+        contactName: clients.contactName,
+        contactEmail: clients.contactEmail,
         address: locations.address,
         city: locations.city,
         state: locations.state,
