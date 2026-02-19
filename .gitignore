@@ -59,3 +59,14 @@ apps/web/blob-report/
 
 # Test credentials
 TEST_CREDENTIALS.md
+
+# Build cache
+*.tsbuildinfo
+
+# Internal strategy & prompt docs
+BPP_Software_Strategy.md
+Supplemental prompt.md
+property-rendition-analysis-prompt.md
+everything-claude-code-walkthrough.md
+marketing.md
+outreach/
